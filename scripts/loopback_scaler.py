@@ -13,12 +13,6 @@ from PIL import ImageFilter, ImageEnhance
 # This modification came from a process that I learned from the AI community to improve details and prepare an
 # image for post-processing.
 
-def show_scale(use_scale):
-    return gr.Slider.update(visible=use_scale)
-
-def show_wh(use_scale):
-    return [gr.Slider.update(visible=(not use_scale))]*2
-
 class Script(scripts.Script):
     def title(self):
         return "Loopback Scaler"
@@ -42,7 +36,7 @@ class Script(scripts.Script):
                     max_width = gr.Slider(minimum=512, maximum=4096, step=64, label='Maximum Image Width:', value=1024, elem_id=self.elem_id("max_width"))
                     max_height = gr.Slider(minimum=512, maximum=4096, step=64, label='Maximum Image Height:', value=1024, elem_id=self.elem_id("max_height"))
                 with gr.Row():
-                    scale = gr.Slider(minimum=.5, maximum=4, step=.1, label='Scale Final Image:', value=1, elem_id=self.elem_id("final_image_scale"), visible=False)
+                    scale = gr.Slider(minimum=.5, maximum=4, step=.1, label='Scale Final Image:', value=1, elem_id=self.elem_id("final_image_scale"))
             with gr.Accordion("Final Image Modification", open=False):
                 with gr.Row():
                     detail_strength = gr.Dropdown(label='Add Detail', choices=self.detail_choices, value="None", elem_id=self.elem_id("detail_strength"))
@@ -58,8 +52,6 @@ class Script(scripts.Script):
                         contrast_strength = gr.Slider(minimum=0.1, maximum=2.0, step=0.01, label='Contrast:', value=1.0, elem_id=self.elem_id("contrast_strength"))
             with gr.Accordion("Info - Loopback Scaler", open=False):
                 helpinfo = gr.HTML("<p style=\"margin-bottom:0.75em\">{}</p>".format(self.help_text))
-        use_scale.change(show_scale, inputs=use_scale, outputs=scale)
-        use_scale.change(show_wh, inputs=use_scale, outputs=[max_width, max_height])
         return [helpinfo, loops, denoising_strength_change_factor, max_width, max_height, scale, use_scale, detail_strength, blur_strength, contour_bool, smooth_strength, sharpness_strength, brightness_strength, color_strength, contrast_strength, adaptive_increment_factor]
 
     def __get_width_from_ratio(self, height, ratio):
