@@ -68,6 +68,9 @@ class Script(scripts.Script):
         elif strength == "Medium": return 2
         elif strength == "High": return 3
         return 0
+    
+    def __lerp(self, a: float, b: float, t: float):
+        return (1 - t) * a + t * b
 
     def run(self, p, _, loops, denoising_strength_change_factor, max_width, max_height, scale, use_scale, detail_strength, blur_strength, contour_bool, smooth_strength, sharpness_strength, brightness_strength, color_strength, contrast_strength, adaptive_increment_factor):
         processing.fix_seed(p)
@@ -97,27 +100,23 @@ class Script(scripts.Script):
        
         initial_color_corrections = [processing.setup_color_correction(p.init_images[0])]
 
-        #determine oritinal image h/w ratio and max h/w ratio
-        current_ratio = p.height / p.width
+        #determine original image h/w ratio and max h/w ratio
+        base_width = p.width
+        base_height = p.height
+        current_ratio = base_height / base_width
         
-        final_height = math.floor(p.height * scale) if use_scale else max_height
-        final_width = math.floor(p.width * scale) if use_scale else max_width
+        final_height = math.floor(base_height * scale) if use_scale else max_height
+        final_width = math.floor(base_width * scale) if use_scale else max_width
         
         max_ratio = final_height / final_width
         use_height = current_ratio >= max_ratio
-                    
-        #set loop increment to the lower of height/width and height if equal
-        if not use_height:
-            #width will hit max first
-            loop_increment = math.floor((final_width - p.width)/loops)
-        else:
-            # height will hit max first
-            # OR if current_ratio and max_ratio are the same, they will hit max at the same time
-            loop_increment = math.floor((final_height - p.height)/loops)
+        base_size = base_height if use_height else base_width
+        final_size = final_height if use_height else final_width
             
         print("Starting Loopback Scaler")
         print(f"Original size: {p.width}x{p.height}")
         print(f"Final size:    {final_width}x{final_height}")
+        print(f"Difference:    {final_size - base_size}")
         
         for n in range(batch_count):
             history = []
@@ -130,19 +129,21 @@ class Script(scripts.Script):
                 p.batch_size = 1
                 p.do_not_save_grid = True
 
-                avg_intensity = np.mean(p.init_images[0])
-                adaptive_increment = int(loop_increment * (avg_intensity / 255) * adaptive_increment_factor)
+                # avg_intensity = np.mean(p.init_images[0])
+                # adaptive_increment = int(loop_increment * adaptive_increment_factor)
+                adaptive_increment = math.floor(self.__lerp(0, final_size - base_size, ((i+1)/loops)))
                 print()
-                print(f"Loopback Scaler:    {i+1}/{loops}")
+                print(f"Loopback Scaler:    {i+1}/{loops} - {((i+1) / loops)*100}%")
                 print(f"adaptive_increment: {adaptive_increment}")
+                print(f"denoising:          {p.denoising_strength}")
                 
                 last_image = i == loops - 1
                 
                 if use_height:
-                    p.height = final_height if last_image else (p.height + adaptive_increment)
+                    p.height = final_height if last_image else (base_height + adaptive_increment)
                     p.width = self.__get_width_from_ratio(p.height, current_ratio)
                 else:
-                    p.width = final_width if last_image else (p.width + adaptive_increment)
+                    p.width = final_width if last_image else (base_width + adaptive_increment)
                     p.height = self.__get_height_from_ratio(p.width, current_ratio)
                     
                 print(f"Iteration size:     {p.width}x{p.height}")
@@ -187,7 +188,7 @@ class Script(scripts.Script):
                 p.all_subseeds.append(p.subseed)
                 p.all_prompts.append(p.prompt)
 
-                p.denoising_strength = min(max(p.denoising_strength * denoising_strength_change_factor, 0.1), 1)
+                p.denoising_strength = min(max(p.denoising_strength * denoising_strength_change_factor, 0.1), 1)    
             
             all_images += history
 
